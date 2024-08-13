@@ -1,0 +1,42 @@
+
+collectstatic command
+--------------------------------------------------------------------------------
+python manage.py collectstatic 
+
+whenever we run this command django looks for all the static files
+in the static folder when we run this command it gather all the files into static
+when we run this command
+STATIC_ROOT = BASE_DIR / 'static' command django copies all the files into root here in our case
+MULTIVENDOR RESTAURANT is static root 
+
+These collected files will served in the production server after we have developed if we don't run this
+command in production static files are not loaded
+
+note: This command should only be used for production websites
+
+
+Storing the sensitive information like passwords of the database
+===================================================================================
+To solve this problem we have package in python called python decouple 
+
+
+from decouple import config in settings.py
+
+create .env file in root directory
+
+In settings we have SECRET_KEY we need to keep this safe just copy the whole key and put in .env file
+the .env file takes data in key-value pair
+
+Now in settings 
+write this code
+
+SECRET_KEY = config('SECRET_KEY')
+
+#In case if you want other users to configure their projects in their system create file called
+.env-sample
+-----------
+Include only keys not values so others can setup the configuration
+
+git status
+---------------------------------------------------------------------
+git status command helps us to know the what work we done until now
