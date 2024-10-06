@@ -40,3 +40,189 @@ Include only keys not values so others can setup the configuration
 git status
 ---------------------------------------------------------------------
 git status command helps us to know the what work we done until now
+
+creating custom User Model
+===================================================================================
+Django comes with default user model such as first name, last name, email address, password etc
+and it uses username as login field
+
+But this Default model can only be used for basic applications we need more flexibility
+
+Here in our case we need to verify whether the user is Customer or Vendor in this case we need to create our own
+Custom Model
+
+To do all this kinds of custom operations we need to modify default Django Model
+
+For this im creating two classes
+
+Class User and UserManagerClass
+
+Here UserManagerClass manages the users it extends the BaseUserManager class from django auth Model because
+Django uses two clssses to Manage clases one is User and other is UserManager
+
+It has two methods one is for creating Regular users and another one is for Creating SuperUsers
+
+Note: To create Custom User Model we need to create applications
+
+Accounts app
+------------------------------
+python manage.py startapp accounts
+
+Go to models.py in account app and import following
+
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+class UserManager(BaseUserManager):
+    pass
+
+class User(AbstractBaseUser):
+    pass    
+
+Note: Usermanager never contain any fields it has two methods for creating regular and super user
+
+class UserManager(BaseUserManager):
+    def create_user(self, first_name:str, last_name,username:str,email,password=None):
+        if not email:
+            raise ValueError("User must have an email address")
+        
+        if not username:
+            raise ValueError("User must have an username")
+        
+        user = self.model(
+            email = self.normalize_email(email),
+            username = username,
+            first_name = first_name,
+            last_name = last_name,
+            
+        )
+        user.set_password(password)
+
+        user.save(using=self._db)
+        return user
+
+
+# Here above we use using = self._db django by default uses this parameter to define which database we need to
+use for this operation it helpful when we have multiple databases, default it takes database configured in settings
+
+import
+--------------------------------------
+BaseUserManager : class allows us to create users and SuperUsers
+AbstractBaseUser : It allows to get full control over the custom user model including the authentication 
+functionality of django
+AbstractUser: Instead of AbstractBaseUser we can also user AbstractUser but it dont give full functionality
+it only allows us to add extra fields
+
+
+Setting up CustomUserManager
+========================================================================================
+
+In settings.py
+
+AUTH_USER_MODEL = 'accounts.User'
+
+Next step is to setup our custom user model inplace of default model
+
+to apply changes we run migrate command but if we done it directly it will create conflicts and raise error as
+already default user model is present to overcome this problem we need to delete the previous one and create new
+
+Simply go to databases and delete foodOnline_db and create again then run makemigrations and migrate commands again
+
+Next createsuperuser again
+
+later go to admin.py and register the UserModel
+
+
+Making Passwords Non-Editable in Admin Panel
+============================================================================
+admin.py
+---------------------------------------------------------------------------
+class CustomUserAdmin(UserAdmin):
+    filter_horizontal = ()
+    list_filter = ()
+    fieldsets = ()
+
+admin.site.register(User, CustomUserAdmin)
+
+
+Create User Profile for customers
+===========================================================================================
+in models.py
+----------------------------------------------------------------------------------------
+class UserProfile(models.Model):
+    user = models.OneToOneField(on_delete=models.CASCADE, blank=True,null=True)
+
+
+OneToOneField is useful when we related user with user profile it is like foreign key
+but with one to one relationship
+
+on_delete=model.CASCADE means if we delete user his whole profile gets deleted
+
+# After created userProfile register in admin
+
+
+Media files configuration
+======================================================================================================
+Create a Media folder in root directory
+
+Go to settings and setup the following
+
+
+MEDIA_URL = "media"
+
+MEDIA_ROOT = BASE_DIR / 'media'
+
+
+Later go to urls.py and setup the following
+
+from django.conf import settings
+from django.conf.urls.static import static
+
+====================================================================================================
+                                     Django Signals
+====================================================================================================
+
+Django signals are used to connect events with actions
+
+Signals are used to perform some actions on every modification or creation of item in the database
+
+Some signals includes pre_save and post_save
+
+pre_save() signal is triggered when something going to be saved 
+
+Fist step is to create the reciever function that listens to the sender here reciever is includes
+pre_save() and sender is our Model
+
+Create signal.py file in accounts and write the following code
+
+@receiver(post_save,User)
+def post_save_create_profile_receiver(sender,instance,created, **kwargs):
+    # Next step is to connect the receiver to the sender here sender is User
+    # we can connect sender and receiver in the below way or simply use decorator
+    #post_save.connect(post_save_create_profile_receiver, sender=User)
+
+    if created:
+        # write code to create user profile as soon as the user is created
+        UserProfile.objects.create(user=instance)
+        print("User profile is created")
+    
+    else:
+        try:
+            profile = User.objects.get(user=instance)
+            profile.save()
+            print("User is updated")
+        except:
+            # Create the user incase if the previously created profile deleted
+            UserProfile.objects.create(user=instance)
+            print("Profile was not exist, but created")
+
+
+# presave will not take receiver flag it will trigger before profile is created 
+@receiver(pre_save,sender=User)
+def pre_save_profile_receiver(sender,instance, **kwargs):
+    print(instance.username,"This user is being created")
+
+------------------------------------------------------------------------------------------------
+After we written this code in signals.py we need to register them inoder to make them work
+in apps.py
+
+def ready(self):
+  import account.signals

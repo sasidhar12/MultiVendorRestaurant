@@ -1,0 +1,268 @@
+Next step is to set paths for registration of user and restaurant
+
+Go to urls.py of main app and import include and add path of accounts to it
+path('accounts/',include('accounts.urls'))
+
+now go to accounts.urls and add paths there
+
+Template inheritence in django
+=================================================================================================
+
+Every website has three main parts header, body, footer for every website the footer and header is
+remains same only body of the website changes suppose you are in hompage and you want to go to
+registration page here what only changes is body but not the footer and header they remain same 
+throughout the website based on this scenrios we have django template inheritence
+
+
+Note:
+
+In template inheritence we keep header and footer in seperate file and extend them wherever we need
+
+steps:
+
+1.Go to templates and go to hompage
+2. In hompage divide the html code into three parts header, body, footer before that create an
+base.html file this file is needed because it include all the links for bootstrap, javascript and css
+
+basically whole code from home.html in base.html
+
+Go to templates and create new file navbar.html, base.html and footer.html
+
+Now add the following code belongs to header, nav bar in these relevant files
+
+add {%load static%} in all of the html files to allow to load static files like images etc
+
+home -- for home interface
+navbar - same across the website
+footer -- same across the website
+
+
+base.html
+------------------------------------------------------------------------------------------------
+in base.html add the following code
+  <!--LOAD NAVBAR HERE -->
+    {% include 'includes/navbar.html'}
+    <!--LOAD CONTENT HERE-->
+	{% block content %}
+	<!--Content Goes here-->
+	{% endblock %}
+    <!--LOAD FOOTER HERE-->
+    {% include 'includes/footer.html'}
+	<!--Main Wrapper-->
+	
+Now go to home.html and add this line in top of the page
+
+{%extends 'base.html'}
+
+and add following code also
+
+{%block content %} when we specify like this, the content goes into 
+
+{%block content %} ..... {%endblock%} which is specified in base.html
+
+
+
+Creating registration from
+--------------------------------------------------------------------------------------------
+go to accounts/views.py render registration form page specify path as accounts/registerUser.html
+
+Note: here accounts/registerUser.html means we create a folder in templates named as accounts and
+add registerUser.html file in it cuz in website we have multiple apps each have their templates
+so inorder to manage files i'm doing this
+
+
+for this registerUser also we have to add header and footer but as we discussed before we can use
+concept called template inheritence
+
+Now add original registerUser form html file
+
+
+Implementing Django model forms
+=====================================================================================================
+Django model formsare the inbuilt freatures of the django and rpovides the replica of the models field
+django forms are secure and safe as well to create a django form we have to create
+
+form.py in app in our case it is accounts
+
+In inbuilt template we have numerous attributes and fields but in our case we only need 
+1.name
+2.username
+3.email
+4.password
+5.confirm password 
+6.phone number
+for this we are Creating the Django forms
+
+accounts/forms.py
+-----------------------------------------------------------------------------------------
+from django import forms
+from . models import User
+class UserForm(forms.ModelForm):
+    password = forms.CharField(widget=forms.PasswordInput())
+    confirm_password = forms.CharField(widget=forms.PasswordInput())
+    class Meta:
+        model = User # Module that we want to modify or replicate
+        fields = ['first_name','last_name','username','email','phone_number','password']
+        
+        # Next step is to go to views and from views call this form class i.e UserForm
+
+
+-------------------------------------------------------------------------------------------
+later go to views.py add the following code in the caller method
+def registerUser(request):
+    form = forms.UserForm()
+    context = {'form':form}
+    return render(request, 'accounts/registerUser.html',context=context)
+
+Now go to registerUser.html
+
+registerUser.html
+---------------------------------------------------------------------------------------
+remove input fields and add the following code {{form.field_name}}
+
+Next step is, go to registerUser.html in the <form> ... </form> tag add
+{%csrf_token %}
+<form action='{%url 'registerUser' %}
+
+in views.py add the following code
+-------------------------------------------------------------------------------------------
+def registerUser(request):
+    if request.method == 'POST':
+        print(request.POST)
+        form = forms.UserForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('registerUser')
+    else:
+        form = forms.UserForm()
+    context = {'form':form}
+    return render(request, 'accounts/registerUser.html',context=context)
+  
+  This will trigger signals when we registered User
+
+
+  we have a scenario where we need to add role to the user whether he is CUSTOMER or RESTAURANT
+  for this write this code instead of above one 
+-----------------------------------------------------------------------------------------------
+  def registerUser(request):
+    if request.method == 'POST':
+        print(request.POST)
+        form = forms.UserForm(request.POST)
+
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.role = User.CUSTOMER
+            user.save()
+            return redirect('registerUser')
+    else:
+        form = forms.UserForm()
+    context = {'form':form}
+    return render(request, 'accounts/registerUser.html',context=context)
+  -------------------------------------------------------------------------------------------
+
+  Pasword validation
+  ======================
+  Here our password is storing as text but we need to store it as a hashing data
+  we can either hash the password in registerUser() function in views or we can use createUserMethod()
+  in django Models
+Method 1:
+----------
+  def registerUser(request):
+    if request.method == 'POST':
+        print(request.POST)
+        form = forms.UserForm(request.POST)
+
+        if form.is_valid():
+            # Getting the password to Hash it
+            password = form.cleaned_data['password'] <-----
+            user = form.save(commit=False)
+            user.role = User.CUSTOMER
+            #saves the password in Hashed format
+            user.set_password(password) <-------
+            user.save()
+            return redirect('registerUser')
+
+
+=================================================================================================
+Django validation
+=================================================================================================
+There are two types of form errors
+1. Field errors
+
+Any errors that are assosiated with model fields are called field errors 
+Ex: In gmail we have unique field when we try to create a account with same mail this error raises
+
+2. Non Field Errors
+
+Errors that are assosiated with form where we can implement custom errors
+Ex: confirm password when we type original password differ from confirm password this error raises
+
+accounts/views.py
+
+In views.py we have method called is_valid() for validation we can implement error in the else
+part if the form is not valid
+
+form.errors:- This will show reason for errors it will return <ul> list of html content of 
+the possible errors we can use that list to display in the views 
+
+the form.is_valid() method is responsible for displaying all the errors
+
+for displaying errrors im creating new <div> tag in registration form to display errors
+
+templates/includes/registerUser.html
+-----------------------------
+                                    <ul class="errorlist">
+                                        {% for field in form %}
+                                        {% if field.errors %}
+                                        {% for error in field.errors %}
+                                        <li style="color:red;">{{error}}</li>
+                                        {% endfor %}
+                                        {% endif %}
+                                        {% endfor %}
+                                    </ul>
+
+Handling non field errors
+
+Inorder to handle non field errors first go to forms.py
+
+in forms.py define method called clean() this method is default called by django whenever
+the form is triggered
+
+==================================================================================================
+Django Messages
+=================================================================================================
+It helps us to display some messages after processing the input
+
+accounts/registerUser.html
+                                  <div class="row">
+                                        <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+                                            {% if messages %}
+                                            {%for message in messages%}
+                                             <div class ="alert alert-primary" role="alert">
+                                                {{message}}
+                                             </div>
+                                            {% endfor %}
+                                            {% endif %} 
+                                        </div>
+                                    </div>
+If we wonder how this messages attribute available in html file because as in contextprocessor
+in settings.py we specify messages in that as a result the things that are specified in contextprocessors
+are available throughout all the html files
+
+
+For Django messages we are applying template inheritence concept
+----------------------------------------------------------------------
+We create a new file called alerts inside includes folder
+
+alerts.html
+-------------
+{% if messages %}
+{%for message in messages%}
+    <div class ="alert alert-success" role="alert">
+        {{message}}
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+    </div>
+{% endfor %}
+{% endif %} 
