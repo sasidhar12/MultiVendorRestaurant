@@ -84,3 +84,13 @@ def registerVendor(request):
         'v_form':v_form
     }
     return render(request,'accounts/registerVendor.html', context=context)
+
+
+def login(request):
+    return render(request, 'accounts/login.html')
+
+def logout(request):
+    return render(request,'You are logged out')
+
+def dashboard(request):
+    return render(request,'Dashboard')
