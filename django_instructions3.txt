@@ -83,3 +83,136 @@ admin.site.register(Vendor, VendorAdmin)
 
 Implementing Login and Logout Features
 -------------------------------------------------------------------------------------------------
+go to accounts/urls.py
+
+from django.urls import path
+from . import views
+urlpatterns = [
+    path('registerUser/',views.registerUser, name='registerUser'),
+    path('registerVendor/',views.registerVendor,name='registerVendor'),
+    path('login/',views.login, name='login'),
+    path('logout/',views.logout,name='logout'),
+    path('dashboard/',views.dashboard,name='dashboard'),
+
+]
+
+go to views.py and add the functionalities
+
+go to accounts create login.html
+
+go to views.py implement login() functionalities
+
+accounts/views.py
+-------------------------------------------------------------------------------------------
+def login(request):
+    if request.method == "POST":
+        email = request.POST['email']
+        password = request.POST['password']
+        user = auth.authenticate(request=request, email=email,password=password)
+        
+    return render(request, 'accounts/login.html')
+
+auth.authenticate() returns user if they exist
+--------------------------------------------------------------------------------------------
+Preventing user from accessing login and registerUser urls after he logged in 
+accounts/views/registerUser() and login() in both functions write this code
+    if request.user.is_authenticated:
+        messages.info(request, "You are already an existing user!")
+        return redirect('dashboard')
+
+Detecting the user whether it is customer or vendor and redirect customer to customer dashboard and
+Vendor to vendor Dashboard
+
+Go to accounts/models.py
+
+write the following function 
+
+    def get_role(self):
+        if self.role == 1:
+            user_role = 'Vendor'
+        elif self.role == 2:
+            user_role = 'Customer'
+        return user_role
+
+in dashboard.html write the following code 
+
+<p>This is a {{user.get_role}}</p>
+
+Next step is to detect the user this will help us to redirect to which dashboard whether it is 
+custDashboard or VendorDashboard or admin 
+go to accounts/urls.py create an patj 
+
+path('myAccount/', views.myAccount, name='myAccount '),
+
+now create an helper file utils.py it contains all the helper functions of our website
+
+accounts/utils.py 
+---------------------------------------------------------------------------------------------------
+def detectUser(user):
+    if user.role == 1:
+        redirectUrl = 'vendorDashboard'
+        return redirectUrl
+    elif user.role == 2:
+        redirectUrl = 'custDashboard'
+        return redirectUrl
+    elif user.role == None and user.is_superadmin:
+        redirectUrl = '/admin'
+        return redirectUrl
+
+---------------------------------------------------------------------------------------------------
+
+accounts/views.py 
+-----------------
+def myAccount(request):
+    user = request.user
+    redirectUrl = detectUser(user)
+    return redirect(redirectUrl)
+
+After creating this function we need to change the dashboard in navbar to myAccount url
+specify this myAccount in both login() and registeruser() function in accounts/views 
+
+Note: Whenver we are not logged and when we try to access the url through browser 
+http://127.0.0.1:8000/accounts/myAccount/ then this raise an error called attribute error
+because whenever we are using myAccount it means we are calling myAccount function and myAccount function
+is only used at when user is send a request and it identifies whether he is an vendor or customer without
+having any user information if we try to call this method by url path it raises inorder to avoid this
+error we need to make sure that we have to call this method only at the time of the login 
+for this we need to use decorator
+
+from django.contrib.auth.decorators import login_required
+
+@login_required(login_url='login',) --> it will send the user to the login page if he didnt login
+def myAccount(request):
+    user = request.user
+    redirectUrl = detectUser(user)
+    return redirect(redirectUrl)
+
+
+------------------------------------------------------------------------------------------------
+Restricting the customer from accessing vendor dashboard and vice versa
+
+
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.core.exceptions import PermissionDenied
+
+#Restrict the vendor from accessing the customer dashboard 
+def check_role_vendor(user):
+    if user.role == 1:
+        return True
+    else:
+        # This error comes from django.core.exceptions
+        raise PermissionDenied("")
+
+
+#  customer from accessing the vendors
+def check_role_customer(user):
+    if user.role ==2:
+        return True
+    else:
+        raise PermissionDenied
+
+-----------------------------------------------------------------------------------------
+Implementing Custom Error templates in django like 403, 404 etc
+just make a html page with error name in templates
+
+ex: templates/includes/403.html
